@@ -128,6 +128,20 @@ class AuthController extends Controller
      *           type="string"
      *      )
      *   ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(
+     *                     description="Image to upload",
+     *                     property="file",
+     *                     type="file",
+     *                ),
+     *                 required={"file"}
+     *             )
+     *         )
+     *    ),
      *   @OA\Response(
      *      response=201,
      *       description="Success",
@@ -159,20 +173,22 @@ class AuthController extends Controller
      * @return \Illuminate\Http\JsonResponse
      */
     public function register(Request $request) {
-        $validator = Validator::make($request->all(), [
+        $input = $request->all();
+        $validator = Validator::make($input, [
             'name' => 'required|string|between:2,100',
             'email' => 'required|string|email|max:100|unique:users',
             'password' => 'required|string|confirmed|min:6',
         ]);
 
         if($validator->fails()){
-            return response()->json($validator->errors(), 422);
+            return response()->json($validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-
-        $user = User::create(array_merge(
-            $validator->validated(),
-            ['password' => bcrypt($request->password)]
-        ));
+        $imageName = uniqid().'.'.$request->file->extension();
+        $path = public_path('images');
+        $request->file->move($path, $imageName);
+        $input['image']= '/images/'.$imageName;
+        $input['password']=bcrypt($request->password);
+        $user = User::create($input);
 
         return response()->json([
             'message' => 'User successfully registered',
